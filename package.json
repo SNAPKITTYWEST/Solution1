@@ -1,0 +1,28 @@
+{
+  "name": "sovereign-bedrock",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build:core": "node scripts/build-core.mjs",
+    "build": "npm run build:core && vite build",
+    "test": "npm run build:core && node --test tests/*.test.mjs",
+    "test:ui": "playwright test",
+    "bench": "node scripts/bench.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "cli": "node cli/main.mjs"
+  },
+  "dependencies": {
+    "@cloudscape-design/components": "^3.0.1386",
+    "@cloudscape-design/design-tokens": "^3.0.113",
+    "@cloudscape-design/global-styles": "^1.0.70",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.1"
+  }
+}

@@ -1,0 +1,67 @@
+name: Verify and publish playground
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: sudo apt-get update && sudo apt-get install -y clang lld
+      - run: npm ci
+      - run: dotnet build Solution1.sln -c Release
+      - run: dotnet run --project Sovereign.Tests -c Release --no-build
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rendered-playground
+          path: artifacts/*.png
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  swift:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install LLVM for wasm32
+        run: brew install llvm
+      - name: Build core
+        run: CLANG="$(brew --prefix llvm)/bin/clang" node scripts/build-core.mjs
+      - name: Swift Wasmtime bridge and XCTest
+        run: bash scripts/test-swift.sh
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [verify, swift]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

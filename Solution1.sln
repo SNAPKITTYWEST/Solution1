@@ -1,0 +1,29 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+#
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sovereign.Bedrock", "Sovereign.Bedrock\Sovereign.Bedrock.csproj", "{AAA07517-52D4-435A-B191-69B40DD568AB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sovereign.Host", "Sovereign.Host\Sovereign.Host.csproj", "{143E19AA-F0C9-4CE0-8953-DDDAC5F7971D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sovereign.Tests", "Sovereign.Tests\Sovereign.Tests.csproj", "{27DB2EE8-5C7A-4C3B-8E1D-FD0829369024}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AAA07517-52D4-435A-B191-69B40DD568AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AAA07517-52D4-435A-B191-69B40DD568AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AAA07517-52D4-435A-B191-69B40DD568AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AAA07517-52D4-435A-B191-69B40DD568AB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{143E19AA-F0C9-4CE0-8953-DDDAC5F7971D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{143E19AA-F0C9-4CE0-8953-DDDAC5F7971D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{143E19AA-F0C9-4CE0-8953-DDDAC5F7971D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{143E19AA-F0C9-4CE0-8953-DDDAC5F7971D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27DB2EE8-5C7A-4C3B-8E1D-FD0829369024}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27DB2EE8-5C7A-4C3B-8E1D-FD0829369024}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27DB2EE8-5C7A-4C3B-8E1D-FD0829369024}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27DB2EE8-5C7A-4C3B-8E1D-FD0829369024}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

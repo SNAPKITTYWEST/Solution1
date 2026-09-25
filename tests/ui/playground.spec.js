@@ -1,0 +1,32 @@
+import {test,expect} from '@playwright/test';
+test('playground, document retrieval, tools, flows, audit and CLI work',async({page})=>{
+ const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack)});
+ await page.goto('/');await expect(page.getByText('Local runtime ready')).toBeVisible();
+ await page.getByRole('button',{name:'Run prompt'}).click();
+ await expect(page.locator('.message.assistant')).toContainText('Sovereign runs deterministic tools');
+ await page.locator('#command').fill('hash hello');await page.locator('.terminal form').press('Enter');
+ await expect(page.locator('.terminal-output')).toContainText('1335831723');
+ await page.getByRole('button',{name:'Knowledge base',exact:false}).click();
+ await page.getByRole('textbox',{name:'Document title'}).fill('Ocean facts');
+ await page.getByRole('textbox',{name:'Document content'}).fill('Whales swim in the ocean.');
+ await page.getByRole('button',{name:'Index document'}).click();
+ await page.getByRole('textbox',{name:'Retrieval query'}).fill('whales');await page.getByRole('button',{name:'Search documents'}).click();
+ await expect(page.locator('.search-hit').first()).toContainText('Ocean facts');
+ await page.getByRole('button',{name:'Workflows',exact:false}).click();
+ await page.getByRole('textbox',{name:'Tool input'}).fill('secret');await page.getByRole('button',{name:'Execute flow'}).click();
+ await expect(page.locator('.result')).toContainText('guard');await expect(page.locator('.result')).not.toContainText('"step": "hash"');
+ await page.getByRole('button',{name:'Audit trail',exact:false}).click();await expect(page.locator('tbody tr').first()).toBeVisible();
+ await page.getByRole('button',{name:'Connection & JWT',exact:false}).click();
+ await page.getByRole('textbox',{name:'JWT access token'}).fill('test-only-noncredential');
+ expect(await page.evaluate(()=>Object.keys(localStorage))).toEqual([]);
+ await page.getByRole('button',{name:'Forget token'}).click();await expect(page.getByRole('textbox',{name:'JWT access token'})).toHaveValue('');
+ expect(errors).toEqual([]);
+});
+test('desktop and mobile layout fit their viewport',async({page})=>{
+ await page.setViewportSize({width:1440,height:1100});await page.goto('/');await expect(page.getByText('Local runtime ready')).toBeVisible();
+ await page.screenshot({path:'artifacts/playground-desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.screenshot({path:'artifacts/playground-mobile.png',fullPage:true});
+ await page.getByRole('button',{name:'Light appearance'}).count();
+});
