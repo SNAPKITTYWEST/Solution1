@@ -97,7 +97,7 @@ npm run bench
 
 `npm test` includes Wasm properties plus an actual HTTP test against the built .NET host. The HTTP test issues temporary credentials in memory, exercises authentication and retrieval isolation, and compares all four .NET primitives against Wasm. Model transport tests use a controlled HTTP handler; they do not establish the quality or availability of any installed language model.
 
-The Pages workflow gates deployment on Linux (.NET, Wasm, frontend, and browser tests). Native macOS Swift XCTest runs in a separate workflow and does not block the browser playground. Screenshots are uploaded as workflow artifacts. The repository does not contain credentials or model weights.
+The Pages workflow installs dependencies, builds the static frontend and Wasm core, and publishes dist. Runtime/browser tests and native Swift tests run in separate workflows; neither blocks Pages deployment. Screenshots are uploaded as workflow artifacts. The repository does not contain credentials or model weights.
 
 ## Capability boundary
 
