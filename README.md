@@ -4,6 +4,10 @@ A local-first model playground built from the existing Solution1 C# project. Clo
 
 This is an independent implementation of a bounded set of Bedrock-style workflows, **not a fork of AWS proprietary source or a full replacement for Amazon Bedrock**. No AWS account, API key, or cloud service is used by the active runtime. The original AWS adapter is preserved in `legacy/aws-adapter/` and excluded from the active solution.
 
+[Open the GitHub Pages playground](https://snapkittywest.github.io/Solution1/)
+
+The browser runs the shared WebAssembly core. Swift is supported through the native host below; this page does not compile or execute arbitrary Swift source.
+
 ## Run the playground
 
 Requires Node 24, npm, and LLVM clang with wasm-ld.
