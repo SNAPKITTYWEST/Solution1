@@ -5,7 +5,7 @@ dist/
 .idea/
 .claude/
 .agents/
-.continuity/
+.continuity/*
 .env
 .env.*
 !.env.example
@@ -19,3 +19,9 @@ data/
 playwright-report/
 test-results/
 skills-lock.json
+# Continuity decision memory — travels with the repo (runtime state stays ignored)
+!.continuity/decisions.jsonl
+!.continuity/decisions.json
+!.continuity/.gitattributes
+!.continuity/SESSION_NOTES.md
+!.continuity/INSTRUCTIONS.md
