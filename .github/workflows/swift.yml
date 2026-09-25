@@ -1,0 +1,22 @@
+name: Verify native Swift host
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  swift:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install LLVM for wasm32
+        run: brew install llvm lld
+      - name: Build core
+        run: CLANG="$(brew --prefix llvm)/bin/clang" WASM_LD="$(brew --prefix lld)/bin/wasm-ld" node scripts/build-core.mjs
+      - name: Swift Wasmtime bridge and XCTest
+        run: bash scripts/test-swift.sh
