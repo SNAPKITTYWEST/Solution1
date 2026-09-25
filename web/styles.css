@@ -11,3 +11,17 @@ body{font-size:14px}.shell{display:flex;min-height:100vh}.sidebar{width:248px;fl
 @media(max-width:850px){.playground-grid{grid-template-columns:1fr}.config-panel{display:none}.top-status{display:none}.two-columns{grid-template-columns:1fr}.stat strong{font-size:18px}}
 @media(max-width:600px){.shell{display:block}.sidebar{position:static;width:100%;padding:17px 15px 9px;border-right:0;border-bottom:1px solid var(--border-subtle)}.brand{font-size:16px}.workspace-label,.nav-caption,.sidebar-bottom{display:none}.sidebar nav{display:flex;overflow-x:auto;margin-top:17px;gap:5px;scrollbar-width:none}.nav-item{width:auto;flex-shrink:0;font-size:10px;padding:8px 10px;margin:0}.nav-item.active{padding:7px 9px}.nav-item>span:first-child{font-size:14px}.main-shell{margin:0;width:100%}.topbar{padding:0 18px;height:44px}.topbar>div{gap:0}.topbar a{font-size:10px}main{padding:22px 15px}.eyebrow{font-size:8px}.page-heading{gap:10px}h1{font-size:25px}.page-heading p{font-size:10px}.version-pill{display:none}.stats{grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px}.stat{padding:12px 14px}.stat strong{font-size:20px}.stat small{font-size:9px}.chat-body{height:350px}.panel-header{padding:0 14px}.tabs{gap:18px}.composer{padding:0 12px 12px}.composer-footer>span{font-size:8px;max-width:140px}.terminal-header>span{display:none}.terminal-label{display:none}.terminal-output{height:130px}footer{gap:15px;font-size:8px}footer>span:last-child{text-align:right}.padded{padding:18px}th,td{padding:8px;font-size:10px}}
 .mobile-controls{display:none}@media(max-width:850px){.mobile-controls{display:flex;gap:10px;margin-bottom:16px;align-items:center}.mobile-controls>div{flex:1;min-width:0}}
+
+/* Sign-in page. The credential never appears in the URL: the fragment is read once and cleared. */
+.login-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg-primary)}
+.login-card{width:100%;max-width:430px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:12px;padding:32px;box-shadow:var(--shadow-md)}
+.login-brand{padding:0;margin-bottom:26px;text-decoration:none}
+.login-card h1{font-size:23px;letter-spacing:-.5px;font-weight:600}
+.login-card form{margin-top:22px}
+.login-card label{display:block;font-size:10px;color:var(--text-secondary);margin-bottom:8px;letter-spacing:.3px}
+.login-card input{width:100%}
+.login-card form button{margin-top:18px;width:100%}
+.login-redirect{display:flex;gap:10px;align-items:center;margin-top:16px;font-size:10px;color:var(--text-muted)}
+.login-foot{display:flex;justify-content:space-between;gap:12px;margin-top:26px;padding-top:18px;border-top:1px solid var(--border-subtle);font-size:10px}
+.login-foot a{color:var(--text-muted);text-decoration:none}
+.login-foot a:hover{color:var(--brand-hover)}

@@ -56,7 +56,41 @@ $env:SOVEREIGN_MODEL = 'your-installed-model-id'
 
 The model endpoint must be loopback. Redirects are disabled. Generation is unavailable (HTTP 503) until a model is configured; no response is fabricated. The HTTP transport supports standard completions and SSE deltas; the current HTTP playground route returns a complete response. Pages cannot execute .NET or host a model. Browser policy may require permission for requests to loopback; a trusted HTTPS reverse proxy is another deployment option.
 
-JWT profile: HS256 only, issuer `sovereign`, audience `sovereign-api`, scope `playground`, nonempty subject, `iat`/`nbf`/`exp`, lifetime at most 15 minutes, constant-time signature comparison. Tokens are issued only by the local CLI. Every service route requires authentication. CORS permits one configured origin. Documents and audit queries are isolated by token subject. Server storage is volatile and documents are capped at 100 per subject; the audit ring retains 1,000 requests. This is a local, single-operator service, not a multitenant internet service.
+JWT profile: HS256 only, issuer `sovereign`, audience `sovereign-api`, scope `playground`, nonempty subject, `iat`/`nbf`/`exp`, lifetime at most 15 minutes, constant-time signature comparison. Tokens are issued by the local CLI, or by the service itself after a successful SAML login. Every service route requires authentication. CORS permits one configured origin. Documents and audit queries are isolated by token subject. Server storage is volatile and documents are capped at 100 per subject; the audit ring retains 1,000 requests. This is a local, single-operator service, not a multitenant internet service.
+
+## Single sign-on (SAML 2.0)
+
+The playground has a sign-in page at `/login`. It performs SP-initiated SAML against the identity provider you configure, and exchanges the verified assertion for the same short-lived HS256 token the CLI issues, so nothing downstream changes.
+
+SAML is **off until configured**. With any of the variables below missing, `/saml/login` and `/saml/metadata` return 503 and `/saml/status` names the missing setting. There are no defaults and no fallback identity provider.
+
+| Variable | Meaning |
+|---|---|
+| `SOVEREIGN_SAML_SP_ENTITYID` | Entity ID this service provider publishes; register it with your IdP |
+| `SOVEREIGN_SAML_ACS` | Public **https** URL the IdP posts assertions back to |
+| `SOVEREIGN_SAML_IDP_ENTITYID` | IdP entity ID, matched against the Response `Issuer` |
+| `SOVEREIGN_SAML_IDP_SSO_POST` | IdP HTTP-POST single-sign-on endpoint |
+| `SOVEREIGN_SAML_IDP_CERT` | Path to a PEM signing certificate, or several separated by `;` |
+| `SOVEREIGN_SAML_SUBJECT_ATTRIBUTE` | Attribute to use as the token subject; defaults to the NameID |
+| `SOVEREIGN_SAML_RETURN_ORIGIN` | Origin the browser is returned to after login |
+| `SOVEREIGN_BIND` | Listener address; loopback by default |
+
+```powershell
+$env:SOVEREIGN_SAML_SP_ENTITYID  = 'https://sovereign.example/saml'
+$env:SOVEREIGN_SAML_ACS          = 'https://sovereign.example/saml/acs'
+$env:SOVEREIGN_SAML_IDP_ENTITYID = 'https://idp.example/entity'
+$env:SOVEREIGN_SAML_IDP_SSO_POST = 'https://idp.example/sso'
+$env:SOVEREIGN_SAML_IDP_CERT     = 'C:\certs\idp-signing.pem'
+# The IdP must be able to reach the ACS, so the host needs a routable listener.
+$env:SOVEREIGN_BIND               = 'http://0.0.0.0:5080'
+dotnet run --project Sovereign.Host -- serve
+```
+
+Register the service provider with your IdP using `GET /saml/metadata` (ACS binding is HTTP-POST). Put a trusted HTTPS reverse proxy in front of the host; the ACS must be reachable over the public internet for the IdP to post to it.
+
+What the validator refuses: unsigned responses, responses not signed by a configured certificate, a Reference that does not cover the Response element, digests that do not match the signed content, SHA-1 digests, an Issuer other than the configured IdP, an audience other than this service provider, expired or not-yet-valid assertions, a missing `InResponseTo`, a replayed `RelayState` (one-time nonce, 10-minute window), and any Assertion that is not a direct child of the signed Response. XML parsing disables DTDs and external entities.
+
+Boundary: this is a SAML 2.0 SP for a single-operator service. There is no session store, no single logout, no IdP-initiated flow, and no user provisioning. Token lifetime stays capped at 15 minutes, so an active user must sign in again when it expires. The Pages site holds no secret; only the host verifies signatures.
 
 | Method | Route | Body / purpose |
 |---|---|---|
@@ -69,6 +103,10 @@ JWT profile: HS256 only, issuer `sovereign`, audience `sovereign-api`, scope `pl
 | POST | `/api/batch` | `{ "operation": "hash", "texts": ["..."] }` |
 | POST | `/api/flows` | `{ "text": "...", "steps": ["normalize", "guard", "hash"] }` |
 | GET | `/api/audit` | current subject's request outcomes |
+| GET | `/saml/metadata` | service-provider metadata for IdP registration |
+| GET | `/saml/status` | whether single sign-on is configured, and what is missing |
+| GET | `/saml/login` | begins SP-initiated login, redirects to the IdP |
+| POST | `/saml/acs` | assertion consumer; returns the token on the URL fragment |
 
 ## Swift host
 
@@ -112,6 +150,7 @@ The Pages workflow installs dependencies, builds the static frontend and Wasm co
 | Batch | up to 100 deterministic inputs | synchronous, no distributed scheduler |
 | Audit | session events and deterministic FNV replay seals | not WORM, cryptographic, or tamper-proof |
 | JWT access control | local issuer and strict service verifier | no managed IAM, SSO, billing, or cloud control plane |
+| SAML 2.0 single sign-on | SP-initiated login, signed-assertion verification, token exchange | no session store, SLO, IdP-initiated flow, or provisioning; requires a public ACS |
 | Fine-tuning, image/video/audio models, distillation, managed evaluation, provisioned throughput | not implemented | require separate models, training code, hardware, and service infrastructure |
 
 Cloudscape + React are the requested UI dependencies. Vite, Playwright, and LLVM are build/test tools. .NET uses only its standard/shared frameworks; AWS SDK and NuGet runtime dependencies are absent from the active projects.
