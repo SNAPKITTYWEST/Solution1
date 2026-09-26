@@ -4,7 +4,7 @@ A local-first model playground built from the existing Solution1 C# project. Clo
 
 This is an independent implementation of a bounded set of Bedrock-style workflows, **not a fork of AWS proprietary source or a full replacement for Amazon Bedrock**. No AWS account, API key, or cloud service is used by the active runtime. The original AWS adapter is preserved in `legacy/aws-adapter/` and excluded from the active solution.
 
-[Open the GitHub Pages playground](https://snapkittywest.github.io/Solution1/)
+The playground is **not** published on GitHub Pages. It requires a signed-in session, so it is served by the service below rather than by a public static site; see [Serving the playground behind a login](#serving-the-playground-behind-a-login).
 
 The browser runs the shared WebAssembly core. Swift is supported through the native host below; this page does not compile or execute arbitrary Swift source.
 
@@ -56,7 +56,22 @@ $env:SOVEREIGN_MODEL = 'your-installed-model-id'
 
 The model endpoint must be loopback. Redirects are disabled. Generation is unavailable (HTTP 503) until a model is configured; no response is fabricated. The HTTP transport supports standard completions and SSE deltas; the current HTTP playground route returns a complete response. Pages cannot execute .NET or host a model. Browser policy may require permission for requests to loopback; a trusted HTTPS reverse proxy is another deployment option.
 
-JWT profile: HS256 only, issuer `sovereign`, audience `sovereign-api`, scope `playground`, nonempty subject, `iat`/`nbf`/`exp`, lifetime at most 15 minutes, constant-time signature comparison. Tokens are issued by the local CLI, or by the service itself after a successful SAML login. Every service route requires authentication. CORS permits one configured origin. Documents and audit queries are isolated by token subject. Server storage is volatile and documents are capped at 100 per subject; the audit ring retains 1,000 requests. This is a local, single-operator service, not a multitenant internet service.
+JWT profile: HS256 only, issuer `sovereign`, audience `sovereign-api`, scope `playground`, nonempty subject, `iat`/`nbf`/`exp`, lifetime at most 15 minutes, constant-time signature comparison. Tokens are issued by the local CLI, or by the service itself after a successful sign-in. Every service route requires authentication. CORS permits one configured origin. Documents and audit queries are isolated by token subject. Server storage is volatile and documents are capped at 100 per subject; the audit ring retains 1,000 requests. This is a local, single-operator service, not a multitenant internet service.
+
+## Serving the playground behind a login
+
+Point the service at the built site and it will serve the playground itself, only to a signed-in session:
+
+```powershell
+$env:SOVEREIGN_WEB_ROOT = (Resolve-Path .\dist).Path
+dotnet run --project Sovereign.Host -- serve
+```
+
+With `SOVEREIGN_WEB_ROOT` set, an unauthenticated request for `/` is redirected to `/login` instead of receiving the application, `/api/*` still answers 401, and `/login` stays reachable so a session can be established. A successful sign-in sets an `HttpOnly`, `SameSite=Strict` session cookie holding the same 15-minute JWT; the browser sends it on navigation, which is why the gate works without JavaScript.
+
+**GitHub Pages does not publish this application.** The Pages workflow deploys only a static notice, because Pages serves static files with no ability to reject a request: an unauthenticated copy on the public internet could be bypassed in one line of JavaScript, so a client-side gate there would be theatre rather than a control. Authentication is enforced by the service, which can actually refuse to respond.
+
+To deploy this yourself, run the service on a host the browser can reach, put a trusted HTTPS reverse proxy in front of it, and point a domain at it. A tunnel works for a private instance. Keep the service on loopback when you do not need it reachable, and set `SOVEREIGN_ALLOWED_ORIGIN` to the exact origin that serves the page.
 
 ## Single sign-on (SAML 2.0)
 
@@ -103,6 +118,9 @@ Boundary: this is a SAML 2.0 SP for a single-operator service. There is no sessi
 | POST | `/api/batch` | `{ "operation": "hash", "texts": ["..."] }` |
 | POST | `/api/flows` | `{ "text": "...", "steps": ["normalize", "guard", "hash"] }` |
 | GET | `/api/audit` | current subject's request outcomes |
+| POST | `/auth/login` | `{ "username": "...", "password": "..." }` returns a token and sets the session cookie |
+| GET | `/auth/status` | which sign-in methods are configured |
+| POST | `/auth/logout` | clears the session cookie |
 | GET | `/saml/metadata` | service-provider metadata for IdP registration |
 | GET | `/saml/status` | whether single sign-on is configured, and what is missing |
 | GET | `/saml/login` | begins SP-initiated login, redirects to the IdP |
@@ -150,6 +168,7 @@ The Pages workflow installs dependencies, builds the static frontend and Wasm co
 | Batch | up to 100 deterministic inputs | synchronous, no distributed scheduler |
 | Audit | session events and deterministic FNV replay seals | not WORM, cryptographic, or tamper-proof |
 | JWT access control | local issuer and strict service verifier | no managed IAM, SSO, billing, or cloud control plane |
+| Session enforcement | service serves the app only to a signed-in session | no refresh or revocation; the 15-minute token simply expires |
 | SAML 2.0 single sign-on | SP-initiated login, signed-assertion verification, token exchange | no session store, SLO, IdP-initiated flow, or provisioning; requires a public ACS |
 | Fine-tuning, image/video/audio models, distillation, managed evaluation, provisioned throughput | not implemented | require separate models, training code, hardware, and service infrastructure |
 

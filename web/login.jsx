@@ -11,7 +11,9 @@ import './styles.css';
 // Sign-in page. The SAML handshake finishes on the .NET service, which redirects back here with
 // a short-lived JWT in the URL fragment. The fragment is read once, cleared from the address bar,
 // and handed to the playground through sessionStorage so the credential never leaves the tab.
-const SERVICE=(sessionStorage.getItem('sovereign-endpoint')||'http://127.0.0.1:5080').replace(/\/+$/,'');
+// The token is not required to render: on this host an unauthenticated visit to the app is
+// already redirected back here, so reaching this page with no session is the normal case.
+const SERVICE=(sessionStorage.getItem('sovereign-endpoint')||window.location.origin).replace(/\/+$/,'');
 
 function Login(){
  const [endpoint,setEndpoint]=useState(SERVICE),[error,setError]=useState(''),[busy,setBusy]=useState(false);
@@ -84,7 +86,6 @@ function Login(){
    {busy&&saml&&!password&&<div className="login-redirect"><Spinner size="small"/><span>Redirecting to your identity provider…</span></div>}
    <footer className="login-foot">
     <a href="https://github.com/SNAPKITTYWEST/Solution1" target="_blank" rel="noreferrer">Repository</a>
-    <a href="./">Continue without signing in</a>
    </footer>
   </section>
  </div>

@@ -1,4 +1,4 @@
-name: Publish playground
+name: Publish sign-in notice
 on:
   push:
     branches: [main]
@@ -8,21 +8,37 @@ permissions:
 concurrency:
   group: pages
   cancel-in-progress: true
+# The playground itself is NOT published here. It is served by the Sovereign service, which
+# requires a signed-in session before it will return the application. Publishing the built
+# site would put an unauthenticated copy on the public internet, where no client-side gate
+# could be trusted, so this workflow deploys only a static notice pointing at the service.
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: sudo apt-get update && sudo apt-get install -y clang lld
-      - run: npm ci
-      - run: npm run build
+      - name: Write notice
+        shell: bash
+        run: |
+          mkdir -p site
+          cat > site/index.html <<'HTML'
+          <!doctype html><html lang="en"><head><meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="robots" content="noindex"><title>Sovereign</title>
+          <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#090d16;color:#f9fafb;font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+          .card{max-width:34rem;padding:2.5rem;text-align:center}
+          h1{font-size:1.4rem;letter-spacing:-.5px;margin:0 0 .75rem}
+          p{color:#9ca3af;margin:0 0 1.5rem}
+          a{display:inline-block;padding:.6rem 1.2rem;border-radius:.5rem;background:#3b82f6;color:#fff;text-decoration:none;font-weight:500}
+          small{display:block;margin-top:2rem;color:#6b7280}</style></head>
+          <body><div class="card"><h1>Sovereign</h1>
+          <p>This playground requires a signed-in session and is served by the Sovereign service, not by this page.</p>
+          <a href="https://github.com/SNAPKITTYWEST/Solution1">Repository</a>
+          <small>Set SOVEREIGN_WEB_ROOT to the built site to serve it behind authentication.</small></div></body></html>
+          HTML
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
   deploy:
     needs: build
     runs-on: ubuntu-latest

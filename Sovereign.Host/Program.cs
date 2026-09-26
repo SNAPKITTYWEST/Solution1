@@ -26,9 +26,17 @@ var pending=new ConcurrentDictionary<string,DateTimeOffset>();
 app.Use(async(context,next)=>{
     // The SAML endpoints and the sign-in endpoints run before any bearer check: the identity
     // provider posts back without an Authorization header, and /auth/login is how one is obtained.
-    if(context.Request.Path.StartsWithSegments("/saml")||context.Request.Path.StartsWithSegments("/auth")){await next(context);return;}
+    if(context.Request.Path.StartsWithSegments("/saml")||context.Request.Path.StartsWithSegments("/auth")||context.Request.Path.StartsWithSegments("/login")){await next(context);return;}
+    // A browser cannot attach an Authorization header to a page navigation, so a successful
+    // sign-in also sets an HttpOnly session cookie. The token is the same short-lived JWT.
     var auth=context.Request.Headers.Authorization.ToString();
-    if(!auth.StartsWith("Bearer ",StringComparison.Ordinal)||!jwt.Validate(auth[7..],DateTimeOffset.UtcNow,out var subject)){context.Response.StatusCode=401;await context.Response.WriteAsJsonAsync(new{error="A valid, unexpired playground JWT is required."});return;}
+    var token=auth.StartsWith("Bearer ",StringComparison.Ordinal)?auth[7..]:context.Request.Cookies["sovereign_session"];
+    if(string.IsNullOrEmpty(token)||!jwt.Validate(token,DateTimeOffset.UtcNow,out var subject)){
+        // An unauthenticated request for the playground is sent to sign-in rather than
+        // being answered with a bare 401, so a browser lands somewhere it can use.
+        if(!context.Request.Path.StartsWithSegments("/api")){context.Response.Redirect("/login");return;}
+        context.Response.StatusCode=401;await context.Response.WriteAsJsonAsync(new{error="A valid, unexpired playground JWT is required."});return;
+    }
     context.Items["subject"]=subject;
     try{await next(context);}
     catch(ArgumentException e){context.Response.StatusCode=400;await context.Response.WriteAsJsonAsync(new{error=e.Message});}
@@ -63,7 +71,11 @@ app.MapPost("/auth/login",(HttpContext c)=>{
         return Results.Json(new{error="Incorrect username or password."},statusCode:401);
     }
     failures.TryRemove(key,out _);
-    return Results.Ok(new{token=jwt.Issue(adminUser,DateTimeOffset.UtcNow),expiresInSeconds=900});
+    var issued=jwt.Issue(adminUser,DateTimeOffset.UtcNow);
+    // HttpOnly keeps the token out of reach of page scripts; SameSite=Strict stops it being
+    // sent on cross-site requests, which is what a CSRF'd sign-in would rely on.
+    c.Response.Cookies.Append("sovereign_session",issued,new CookieOptions{HttpOnly=true,SameSite=SameSiteMode.Strict,Secure=c.Request.IsHttps,Path="/",MaxAge=TimeSpan.FromMinutes(15)});
+    return Results.Ok(new{token=issued,expiresInSeconds=900});
 });
 app.MapGet("/saml/metadata",()=>samlProblem is not null?Results.Problem("SAML is not configured.",statusCode:503):Results.Text(saml.Metadata,"application/xml"));
 app.MapGet("/saml/status",()=>new{enabled=samlProblem is null,problem=samlProblem,entityId=saml.EntityId,acs=saml.AssertionConsumerService.AbsoluteUri,idp=idp.Issuer,subjectAttribute=Environment.GetEnvironmentVariable("SOVEREIGN_SAML_SUBJECT_ATTRIBUTE")??"email"});
@@ -86,10 +98,13 @@ app.MapPost("/saml/acs",async(HttpContext c)=>{
     catch(SamlException e){return Results.BadRequest(new{error=e.Message});}
     var attribute=Environment.GetEnvironmentVariable("SOVEREIGN_SAML_SUBJECT_ATTRIBUTE");
     var subject=attribute is { Length:>0 } key&&identity.Attributes.TryGetValue(key,out var value)&&!string.IsNullOrWhiteSpace(value)?value:identity.Subject;
-    // Issue the token once and bind it to the configured return origin; no open redirect.
-    var issued=Uri.EscapeDataString(jwt.Issue(subject,DateTimeOffset.UtcNow));
-    var landing=allowedReturn is { Length:>0 } configured?configured.TrimEnd('/')+"/login":"/login";
-    return Results.Redirect($"{landing}#token={issued}");
+    // Issue the token once and bind the return location to the configured origin.
+    var raw=jwt.Issue(subject,DateTimeOffset.UtcNow);
+    c.Response.Cookies.Append("sovereign_session",raw,new CookieOptions{HttpOnly=true,SameSite=SameSiteMode.Strict,Secure=c.Request.IsHttps,Path="/",MaxAge=TimeSpan.FromMinutes(15)});
+    // When the operator has pinned a return origin, hand the browser back to the sign-in page
+    // there so it can pick up the token. With no origin configured, stay on this host.
+    if(allowedReturn is { Length:>0 } configured)return Results.Redirect($"{configured.TrimEnd('/')}/login#token={Uri.EscapeDataString(raw)}");
+    return Results.Redirect("/login#token="+Uri.EscapeDataString(raw));
 });
 app.MapGet("/api/status",()=>new{service="Sovereign .NET",authentication="HS256 JWT",samlEnabled=samlProblem is null,aws=false,modelConfigured=!string.IsNullOrWhiteSpace(model)});
 app.MapGet("/api/models",()=>new{models=string.IsNullOrWhiteSpace(model)?Array.Empty<string>():new[]{model}});
@@ -107,6 +122,21 @@ app.MapPost("/api/retrieve",(PromptRequest r,HttpContext c)=>{var q=LocalTools.E
 app.MapPost("/api/batch",(BatchRequest r)=>{if(r.Texts is null||r.Texts.Length is <1 or >100)throw new ArgumentException("Batch requires 1–100 inputs.");return r.Texts.Select(text=>new{text,value=LocalTools.Run(r.Operation,text)}).ToArray();});
 app.MapPost("/api/flows",(FlowRequest r)=>{if(r.Steps is null||r.Steps.Length is <1 or >16)throw new ArgumentException("Flow requires 1–16 steps.");var text=r.Text;var results=new List<object>();foreach(var step in r.Steps){var value=LocalTools.Run(step,text);results.Add(new{step,value});if(step=="guard"&&(uint)value!=0)break;if(step=="normalize")text=(string)value;}return results;});
 app.MapGet("/api/audit",(HttpContext c)=>audit.ToArray().Where(e=>e.Subject==(string)c.Items["subject"]!));
+// Clears the session cookie. The token itself stays valid until it expires, so this ends
+// the browser session rather than revoking the credential.
+app.MapPost("/auth/logout",(HttpContext c)=>{c.Response.Cookies.Delete("sovereign_session",new CookieOptions{Path="/"});return Results.Ok(new{signedOut=true});});
+
+// Serve the built playground from this host so the app is only reachable once a session
+// exists. SOVEREIGN_WEB_ROOT points at the Vite build output; without it the host is
+// API-only and the caller keeps using the separately deployed front end.
+var webRoot=Environment.GetEnvironmentVariable("SOVEREIGN_WEB_ROOT");
+if(!string.IsNullOrWhiteSpace(webRoot)&&Directory.Exists(webRoot)){
+    var provider=new Microsoft.Extensions.FileProviders.PhysicalFileProvider(Path.GetFullPath(webRoot));
+    app.UseDefaultFiles(new DefaultFilesOptions{FileProvider=provider});
+    app.UseStaticFiles(new StaticFileOptions{FileProvider=provider,OnPrepareResponse=ctx=>ctx.Context.Response.Headers.CacheControl="no-store"});
+    // Unknown paths fall back to the single-page app rather than 404.
+    app.MapFallbackToFile("index.html",new Microsoft.AspNetCore.Builder.StaticFileOptions{FileProvider=provider});
+}
 await app.RunAsync();
 public record ToolRequest(string Operation,string Text);
 public record PromptRequest(string Prompt);

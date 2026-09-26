@@ -17,7 +17,20 @@ try{_=new BedrockProvider(new HttpClient(),new Uri("https://example.com"));Check
 using var client=new HttpClient(new FakeHandler());var backend=new BedrockBackend(client,new Uri("http://127.0.0.1:11434/"),"test-model");
 Check(await backend.GenerateAsync(new[]{("user","hello")})=="local response","Local model transport");
 var provider=new BedrockProvider(client,new Uri("http://127.0.0.1:11434/"));var chunks=new List<JsonNode>();await foreach(var chunk in provider.InvokeModelStreamAsync("test-model",new JsonArray()))chunks.Add(chunk);
-Check(chunks.Count==1&&chunks[0]["choices"]![0]!["delta"]!["content"]!.GetValue<string>()=="hi","SSE stream transport");Console.WriteLine($"{count} checks passed.");
+Check(chunks.Count==1&&chunks[0]["choices"]![0]!["delta"]!["content"]!.GetValue<string>()=="hi","SSE stream transport");
+
+// Password sign-in. Only the PBKDF2 digest is ever stored, never the password itself.
+var digest=Password.Hash("correct horse",100_000);
+Check(Password.Verify(digest,"correct horse"),"Password accepts the right password");
+Check(!Password.Verify(digest,"wrong horse"),"Password rejects the wrong password");
+Check(!Password.Verify(digest,""),"Password rejects an empty candidate");
+Check(!Password.Verify(digest,"correct horse "),"Password is not trimmed");
+Check(!Password.Verify(null,"correct horse"),"Password rejects an absent digest");
+Check(!Password.Verify("pbkdf2$1000$AAAA$AAAA","x"),"Password rejects a weak iteration count");
+Check(!Password.Verify("garbage","x"),"Password rejects a malformed digest");
+Check(Password.Hash("a")!=Password.Hash("a"),"Password salts each digest");
+Check(Password.Verify(Password.Hash("x"),"x")&&!digest.Contains("correct horse"),"Password never stores the plaintext");
+Console.WriteLine($"{count} checks passed.");
 sealed class FakeHandler:HttpMessageHandler{
 protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken){
 var body=JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!;if(request.RequestUri!.AbsolutePath!="/v1/chat/completions")throw new Exception("Wrong endpoint");bool stream=body["stream"]!.GetValue<bool>();
