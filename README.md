@@ -73,6 +73,8 @@ With `SOVEREIGN_WEB_ROOT` set, an unauthenticated request for `/` is redirected 
 
 To deploy this yourself, run the service on a host the browser can reach, put a trusted HTTPS reverse proxy in front of it, and point a domain at it. A tunnel works for a private instance. Keep the service on loopback when you do not need it reachable, and set `SOVEREIGN_ALLOWED_ORIGIN` to the exact origin that serves the page.
 
+`deploy/` contains a Caddyfile, an nginx site, and a hardened systemd unit, with the commands and the verification steps in [deploy/README.md](deploy/README.md). Check the gate from outside the server rather than assuming it holds: an unauthenticated `/` must answer 302 to `/login`, and `Set-Cookie` must include `secure`, `httponly` and `samesite=strict`.
+
 ## Single sign-on (SAML 2.0)
 
 The playground has a sign-in page at `/login`. It performs SP-initiated SAML against the identity provider you configure, and exchanges the verified assertion for the same short-lived HS256 token the CLI issues, so nothing downstream changes.

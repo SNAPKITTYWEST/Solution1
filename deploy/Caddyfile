@@ -1,0 +1,43 @@
+# Sovereign behind Caddy.
+#
+# Caddy obtains and renews TLS automatically, so the only host-specific edit is
+# the domain on the first line. The service stays bound to loopback; this proxy is
+# the only thing reachable from the internet.
+#
+#   sovereign.example.com  ->  127.0.0.1:5080
+#
+# Caddy forwards X-Forwarded-Proto, which is what makes the service issue its
+# session cookie with the Secure attribute.
+
+sovereign.example.com {
+	encode zstd gzip
+
+	# The SAML assertion consumer is a form POST from the identity provider.
+	# Nothing here is large, but the service enforces its own 1 MiB body limit.
+	request_body {
+		max_size 2MB
+	}
+
+	reverse_proxy 127.0.0.1:5080 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		# The playground loads no third-party origins, so the policy can stay tight.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+	}
+
+	# No credential redaction filter is needed: Caddy already logs Cookie, Set-Cookie and
+	# Authorization as REDACTED, and the SAMLResponse travels in a POST body, which is
+	# never written to the access log. Keep rolling on so the log cannot fill the disk.
+	log {
+		output file /var/log/caddy/sovereign.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+	}
+}

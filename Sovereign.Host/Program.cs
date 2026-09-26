@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.AspNetCore.HttpOverrides;
 using Sovereign.Bedrock;
 using Sovereign.Host;
 var command=args.FirstOrDefault()??"help";
@@ -14,8 +15,16 @@ var builder=WebApplication.CreateBuilder(Array.Empty<string>());
 // Loopback by default. A public SAML assertion consumer requires a routable listener,
 // so the operator can opt into a wider bind explicitly.
 builder.WebHost.UseUrls(Environment.GetEnvironmentVariable("SOVEREIGN_BIND")??"http://127.0.0.1:5080");builder.WebHost.ConfigureKestrel(o=>o.Limits.MaxRequestBodySize=1024*1024);
+// Behind a TLS-terminating proxy the connection Kestrel sees is plain HTTP, so Request.IsHttps
+// would be false and the session cookie would be issued without Secure. Trusting the forwarded
+// headers restores it. This is safe only while the service stays bound to loopback, because
+// those headers are then set by the local proxy and not by an outside caller.
+builder.Services.Configure<ForwardedHeadersOptions>(o=>{
+    o.ForwardedHeaders=ForwardedHeaders.XForwardedFor|ForwardedHeaders.XForwardedProto;
+    o.KnownNetworks.Clear();o.KnownProxies.Clear();
+});
 var origin=Environment.GetEnvironmentVariable("SOVEREIGN_ALLOWED_ORIGIN")??"http://127.0.0.1:5173";
-builder.Services.AddCors(o=>o.AddDefaultPolicy(p=>p.WithOrigins(origin).WithMethods("GET","POST").WithHeaders("Authorization","Content-Type")));var app=builder.Build();app.UseCors();
+builder.Services.AddCors(o=>o.AddDefaultPolicy(p=>p.WithOrigins(origin).WithMethods("GET","POST").WithHeaders("Authorization","Content-Type")));var app=builder.Build();app.UseForwardedHeaders();app.UseCors();
 var documents=new ConcurrentDictionary<string,ConcurrentDictionary<int,Document>>();var audit=new ConcurrentQueue<AuditEvent>();int id=0;
 var model=Environment.GetEnvironmentVariable("SOVEREIGN_MODEL")??"";var endpoint=new Uri(Environment.GetEnvironmentVariable("SOVEREIGN_MODEL_ENDPOINT")??"http://127.0.0.1:11434/");
 using var http=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){Timeout=TimeSpan.FromSeconds(60),MaxResponseContentBufferSize=4*1024*1024};var backend=new BedrockBackend(http,endpoint,model);

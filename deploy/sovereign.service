@@ -1,0 +1,55 @@
+[Unit]
+Description=Sovereign playground service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sovereign
+Group=sovereign
+WorkingDirectory=/opt/sovereign
+
+# The service stays on loopback. The proxy in front is the only public listener.
+Environment=SOVEREIGN_BIND=http://127.0.0.1:5080
+
+# The built playground, served by the service and gated on a signed-in session.
+Environment=SOVEREIGN_WEB_ROOT=/opt/sovereign/dist
+
+# The exact origin that serves the page. No wildcard, no trailing slash.
+Environment=SOVEREIGN_ALLOWED_ORIGIN=https://sovereign.example.com
+
+# Only these two SAML values are required for password sign-in. Set the rest
+# when wiring an identity provider:
+#   SOVEREIGN_SAML_SP_ENTITYID=https://sovereign.example.com/saml
+#   SOVEREIGN_SAML_ACS=https://sovereign.example.com/saml/acs
+#   SOVEREIGN_SAML_IDP_ENTITYID=https://idp.example/entity
+#   SOVEREIGN_SAML_IDP_SSO_POST=https://idp.example/sso
+#   SOVEREIGN_SAML_IDP_CERT=/etc/sovereign/idp-signing.pem
+
+# PBKDF2 digest, not the password. Generate one with:
+#   dotnet run --project Sovereign.Host -- passwd "yourpassword"
+# Store it in a root-only file rather than here: EnvironmentFile=/etc/sovereign/secrets.env
+EnvironmentFile=-/etc/sovereign/secrets.env
+
+# This file must contain, mode 0600, owned by root:
+#   SOVEREIGN_JWT_SECRET=<32+ random bytes>
+#   SOVEREIGN_ADMIN_PASSWORD_HASH=pbkdf2$210000$...
+ExecStart=/usr/bin/dotnet run --project /opt/sovereign/Sovereign.Host -c Release --no-build -- serve
+
+Restart=on-failure
+RestartSec=5
+
+# The service needs no write access outside its own state, and no privileges.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/sovereign
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
